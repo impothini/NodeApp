@@ -1,33 +1,37 @@
-node {
-    def app
-
-    stage('Clone repository') {
-        /* Cloning the Repository to our Workspace */
-
-        checkout scm
+pipeline {
+    agent any
+    options {
+        ansiColor('xterm')
     }
-
-    stage('Build image') {
-        /* This builds the actual image */
-
-        app = docker.build("anandr72/nodeapp")
-    }
-
-    stage('Test image') {
-        
-        app.inside {
-            echo "Tests passed"
+    environment {
+        registry = "impothini/nodeapp"
+        registryCredential = 'reg-cred'
+  }
+    stages {
+        stage('scm checkout') {
+            steps {
+                script{
+                    gitVar= git ( branch: 'master', url: 'https://github.com/impothini/NodeApp.git')
+                }
+            }
+        }
+        stage('Docker Build') {
+            steps {
+                script{
+                    dockerImage = docker.build registry 
+                }
+            }
+        }
+        stage('Push Image') {
+          steps{
+            script {
+                docker.withRegistry('https://registry.hub.docker.com', registryCredential) {
+                dockerImage.push("${gitVar.GIT_LOCAL_BRANCH}-${env.BUILD_NUMBER}")
+                dockerImage.push("latest")
+              }
+            }
+          }
         }
     }
-
-    stage('Push image') {
-        /* 
-			You would need to first register with DockerHub before you can push images to your account
-		*/
-        docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
-            app.push("${env.BUILD_NUMBER}")
-            app.push("latest")
-            } 
-                echo "Trying to Push Docker Build to DockerHub"
-    }
 }
+
